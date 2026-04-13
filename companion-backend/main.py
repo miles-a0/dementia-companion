@@ -42,5 +42,19 @@ async def health_check():
     return {"status": "ok", "service": "companion-api"}
 
 
+# ============================================================================
+# CARER ROUTE PROTECTION EXAMPLE
+# ============================================================================
+# To protect carrier routes with JWT authentication, import get_current_carer
+# from routers.auth and use it as a dependency:
+#
+# from routers.auth import get_current_carer
+# from fastapi import Depends
+#
+# @router.get("/carer/protected-endpoint", dependencies=[Depends(get_current_carer)])
+# async def protected_route():
+#     return {"message": "This is for carriers only"}
+# ============================================================================
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

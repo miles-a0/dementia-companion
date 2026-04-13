@@ -1,5 +1,7 @@
 import os
 import logging
+import json
+import httpx
 from datetime import datetime
 from typing import Optional
 
@@ -10,6 +12,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="", tags=["messages"])
 
 QDRANT_URL = os.getenv("QDRANT_URL", "http://qdrant:6333")
+N8N_LEARNING_WEBHOOK_URL = os.environ.get("N8N_LEARNING_WEBHOOK_URL")
 
 
 def get_db_connection():
@@ -23,6 +26,89 @@ def get_db_connection():
     except Exception as e:
         logger.warning(f"Database connection failed: {e}")
         return None
+
+
+def get_or_create_conversation(db_conn, user_id: int, trigger_type: str = 'manual') -> int:
+    """Get existing open conversation or create new one"""
+    cursor = db_conn.cursor()
+    
+    cursor.execute("""
+        SELECT id FROM conversations
+        WHERE user_id = %s AND ended_at IS NULL
+        AND started_at > NOW() - INTERVAL '10 minutes'
+        ORDER BY started_at DESC LIMIT 1
+    """, (user_id,))
+    
+    row = cursor.fetchone()
+    if row:
+        cursor.close()
+        return row[0]
+    
+    cursor.execute("""
+        INSERT INTO conversations (user_id, started_at, transcript, trigger_type)
+        VALUES (%s, NOW(), '[]'::jsonb, %s)
+        RETURNING id
+    """, (user_id, trigger_type))
+    
+    new_id = cursor.fetchone()[0]
+    db_conn.commit()
+    cursor.close()
+    return new_id
+
+
+def append_to_transcript(db_conn, conversation_id: int, role: str, text: str):
+    """Append a message to the conversation transcript"""
+    cursor = db_conn.cursor()
+    
+    entry = json.dumps([{"role": role, "text": text, "time": datetime.utcnow().isoformat()}])
+    
+    cursor.execute("""
+        UPDATE conversations 
+        SET transcript = transcript || %s::jsonb
+        WHERE id = %s
+    """, (entry, conversation_id))
+    
+    db_conn.commit()
+    cursor.close()
+
+
+def check_and_close_stale_conversations(db_conn, user_id: int):
+    """Close conversations older than 10 minutes and trigger learning webhook"""
+    cursor = db_conn.cursor()
+    
+    cursor.execute("""
+        SELECT id FROM conversations
+        WHERE user_id = %s AND ended_at IS NULL
+        AND started_at < NOW() - INTERVAL '10 minutes'
+    """, (user_id,))
+    
+    stale_ids = [row[0] for row in cursor.fetchall()]
+    
+    if stale_ids:
+        cursor.execute("""
+            UPDATE conversations SET ended_at = NOW()
+            WHERE user_id = %s AND ended_at IS NULL
+            AND started_at < NOW() - INTERVAL '10 minutes'
+        """, (user_id,))
+        db_conn.commit()
+        
+        if N8N_LEARNING_WEBHOOK_URL:
+            for conv_id in stale_ids:
+                try:
+                    import threading
+                    def trigger_webhook():
+                        try:
+                            httpx.post(N8N_LEARNING_WEBHOOK_URL, json={
+                                "conversation_id": conv_id,
+                                "user_id": user_id
+                            }, timeout=5.0)
+                        except Exception:
+                            pass
+                    threading.Thread(target=trigger_webhook).start()
+                except Exception as e:
+                    logger.warning(f"Could not trigger learning webhook: {e}")
+    
+    cursor.close()
 
 
 async def queue_message(user_id, content, message_type):
@@ -70,12 +156,22 @@ async def respond_to_message(
     conversation_id: Optional[int] = Body(default=None)
 ):
     try:
+        conn = get_db_connection()
+        
+        if conn:
+            try:
+                check_and_close_stale_conversations(conn, user_id)
+                conversation_id = get_or_create_conversation(conn, user_id, 'manual')
+                append_to_transcript(conn, conversation_id, 'user', text)
+            except Exception as e:
+                logger.warning(f"Could not manage conversation: {e}")
+        
         # a. Search Qdrant for relevant memories
-        collections = ["life_stories", "merchant_navy", "family", "jokes", "preferences"]
+        collections_list = ["life_stories", "merchant_navy", "family", "jokes", "preferences"]
         memories = []
         
-        for collection in collections:
-            results = await search_memories(text, [collection], limit=3)
+        for coll in collections_list:
+            results = await search_memories(text, [coll], limit=3)
             memories.extend(results)
         
         # b. Build system prompt
@@ -94,21 +190,13 @@ Here are some things you know about John:
         # c. Get AI response
         ai_response = await get_ai_response(system_prompt, text)
         
-        # d. Log to Postgres conversations table
-        conn = get_db_connection()
+        # d. Log assistant response to transcript
         if conn:
             try:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO conversations (user_id, started_at, transcript, trigger_type)
-                    VALUES (%s, %s, %s, %s)
-                """, (user_id, datetime.utcnow(), f'{{"user": "{text}", "assistant": "{ai_response}"}}', 'manual'))
-                conn.commit()
-                cursor.close()
+                append_to_transcript(conn, conversation_id, 'assistant', ai_response)
                 conn.close()
-                conversation_id = None
             except Exception as e:
-                logger.warning(f"Could not log conversation: {e}")
+                logger.warning(f"Could not append assistant response: {e}")
         
         # e. Return response
         return {"response": ai_response, "conversation_id": conversation_id}
@@ -281,3 +369,38 @@ Ask how he's feeling and remind him of the date."""
     except Exception as e:
         logger.error(f"Error in trigger_intervention: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/conversations/{conversation_id}")
+async def get_conversation(conversation_id: int):
+    """Get conversation details including transcript"""
+    conn = get_db_connection()
+    if not conn:
+        return {"error": "Database not configured"}
+    
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, user_id, started_at, ended_at, transcript, trigger_type
+            FROM conversations WHERE id = %s
+        """, (conversation_id,))
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if not row:
+            return {"error": "Conversation not found"}
+        
+        return {
+            "id": row[0],
+            "user_id": row[1],
+            "started_at": row[2].isoformat() if row[2] else None,
+            "ended_at": row[3].isoformat() if row[3] else None,
+            "transcript": row[4],
+            "trigger_type": row[5]
+        }
+    except Exception as e:
+        logger.error(f"Error getting conversation: {e}")
+        if conn:
+            conn.close()
+        return {"error": str(e)}

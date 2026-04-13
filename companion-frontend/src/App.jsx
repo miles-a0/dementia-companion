@@ -1,11 +1,13 @@
 import React from 'react';
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import HomeScreen from './components/HomeScreen';
 import GreetingBanner from './components/GreetingBanner';
 import PhotoViewer from './components/PhotoViewer';
 import MusicPlayer from './components/MusicPlayer';
 import GameScreen from './components/GameScreen';
+import CarerLogin from './components/CarerLogin';
+import CarerDashboard from './components/CarerDashboard';
 import { speak, listen, isSupported } from './services/speech';
 import { startPolling, stopPolling } from './services/polling';
 import './styles/john.css';
@@ -22,6 +24,7 @@ function App() {
   var showMusic = useState(false);
   var musicTrack = useState(null);
   var showGame = useState(false);
+  var carrierAuthenticated = useState(false);
 
   var setGreetingMessage = greetingMessage[1];
   var setGreetingType = greetingType[1];
@@ -34,6 +37,7 @@ function App() {
   var setShowMusic = showMusic[1];
   var setMusicTrack = musicTrack[1];
   var setShowGame = showGame[1];
+  var setCarerAuthenticated = carrierAuthenticated[1];
 
   greetingMessage = greetingMessage[0];
   greetingType = greetingType[0];
@@ -46,6 +50,23 @@ function App() {
   showMusic = showMusic[0];
   musicTrack = musicTrack[0];
   showGame = showGame[0];
+  carrierAuthenticated = carrierAuthenticated[0];
+
+  React.useEffect(function() {
+    var token = localStorage.getItem('companion_carer_token');
+    if (token) {
+      setCarerAuthenticated(true);
+    }
+  }, []);
+
+  function handleCarerLogin() {
+    setCarerAuthenticated(true);
+  }
+
+  function handleCarerLogout() {
+    localStorage.removeItem('companion_carer_token');
+    setCarerAuthenticated(false);
+  }
 
   function handleIncomingMessage(message) {
     if (message && message.content) {
@@ -227,6 +248,42 @@ function App() {
     );
   }
 
+  var carrierLinkStyle = {
+    position: 'fixed',
+    bottom: '10px',
+    right: '10px',
+    fontSize: '14px',
+    color: '#999',
+    textDecoration: 'none'
+  };
+
+  if (showPhotos || showMusic || showGame) {
+    content = React.createElement('div', { style: { position: 'relative', height: '100vh' } },
+      content,
+      React.createElement(Link, { to: '/carer', style: carrierLinkStyle }, 'Carer')
+    );
+  } else {
+    content = React.createElement('div', { style: { position: 'relative', height: '100vh' } },
+      React.createElement(GreetingBanner, {
+        message: greetingMessage,
+        messageType: greetingType,
+        onDismiss: handleDismissGreeting
+      }),
+      React.createElement(HomeScreen, {
+        onHelpPress: handleHelpPress,
+        onPhotos: handlePhotos,
+        onMusic: handleMusic,
+        onGames: handleGames,
+        greetingMessage: greetingMessage,
+        isListening: isListening,
+        isSpeaking: isSpeaking,
+        onListenStart: handleListenStart,
+        onListenEnd: handleListenEnd
+      }),
+      React.createElement(Link, { to: '/carer', style: carrierLinkStyle }, 'Carer')
+    );
+  }
+
   return (
     <BrowserRouter>
       <Routes>
@@ -234,7 +291,17 @@ function App() {
           path="/"
           element={content}
         />
-        <Route path="/carer" element={<div>Carer dashboard coming in Phase 9</div>} />
+        <Route 
+          path="/carer/login" 
+          element={React.createElement(CarerLogin, { onLoginSuccess: handleCarerLogin })} 
+        />
+        <Route 
+          path="/carer" 
+          element={carrierAuthenticated 
+            ? React.createElement(CarerDashboard, { onLogout: handleCarerLogout })
+            : React.createElement(Navigate, { to: '/carer/login', replace: true })
+          } 
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

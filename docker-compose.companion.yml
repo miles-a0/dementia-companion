@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: companion
       POSTGRES_USER: companion
-      POSTGRES_PASSWORD: your_secure_password_here
+      POSTGRES_PASSWORD: Love1stheDrug!
     volumes:
       - companion-postgres:/var/lib/postgresql/data
     ports:
@@ -32,10 +32,10 @@ services:
       - VIKUNJA_URL=https://vik.zu-auto.co.uk
       - VIKUNJA_API_KEY=tk_78320358404f85c3fe92b139dc307d04ba3de518
       - OPENROUTER_API_KEY=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
-      - DATABASE_URL=postgresql://companion:your_secure_password_here@db:5432/companion
+      -       DATABASE_URL=postgresql://companion:Love1stheDrug!@db:5432/companion
       - JWT_SECRET=zY8rJpQ4sVn2XcKfL1aW7eTgH5uBqD3mR6yN0oI8pCwSxE4FvUjZkG1hM2lA9t
       - CARER_USERNAME=carer
-      - CARER_PASSWORD=your_carer_password
+      -       CARER_PASSWORD=Love1stheDrug!
       - JOHN_LAT=53.8317
       - JOHN_LON=-2.2340
       - JOHN_USER_ID=1

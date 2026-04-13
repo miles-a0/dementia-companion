@@ -170,26 +170,33 @@ In Portainer:
 
 ---
 
-## Step 4: Deploy n8n (Automation)
+## Step 4: Connect to Existing n8n
 
-In Portainer:
-1. Go to **Containers** > **Add Container**
-2. Configure:
-   - **Name**: `companion-n8n`
-   - **Image**: `n8nio/n8n:latest`
-   - **Network**: `companion-network`
-3. Publish port:
-   - Host: `5678`
-   - Container: `5678`
-4. Environment variables:
-   - `N8N_BASIC_AUTH_ACTIVE`: `true`
-   - `N8N_BASIC_AUTH_USER`: `admin`
-   - `N8N_BASIC_AUTH_PASSWORD`: `Choose a password`
-   - `WEBHOOK_URL`: `http://your-vps-ip:5678`
-5. Volumes:
-   - Host path: `/opt/companion/n8n`
-   - Container path: `/home/node/.n8n`
-6. Click **Deploy**
+You already have n8n running at `https://n8n.zu-auto.co.uk/`. 
+
+### 4.1 Add n8n to companion-network (Optional)
+
+If you want n8n to communicate with the API on the internal Docker network:
+
+1. Go to **Containers** in Portainer
+2. Find your existing n8n container (likely named `n8n-n8n-1`)
+3. Click **Edit**
+4. Under **Networks**, add `companion-network`
+5. Click **Update**
+
+### 4.2 Get the webhook URL
+
+The backend needs to send webhooks to n8n. You have two options:
+
+**Option A: Use External URL (simpler)**
+- Your n8n is accessible at `https://n8n.zu-auto.co.uk/`
+- Create a workflow with a webhook trigger
+- The webhook URL will be like: `https://n8n.zu-auto.co.uk/webhook/learning-loop`
+- Set this in your API environment: `N8N_LEARNING_WEBHOOK_URL=https://n8n.zu-auto.co.uk/webhook/learning-loop`
+
+**Option B: Use Internal Docker Network (faster)**
+- Add n8n to `companion-network` 
+- Use internal URL: `http://n8n-n8n-1:5678/webhook/learning-loop`
 
 ---
 
@@ -254,23 +261,6 @@ services:
       - companion-network
     restart: unless-stopped
 
-  # n8n Automation
-  n8n:
-    image: n8nio/n8n:latest
-    container_name: companion-n8n
-    environment:
-      - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=admin
-      - N8N_BASIC_AUTH_PASSWORD=your_n8n_password
-      - WEBHOOK_URL=http://localhost:5678
-    volumes:
-      - /opt/companion/n8n:/home/node/.n8n
-    ports:
-      - "5678:5678"
-    networks:
-      - companion-network
-    restart: unless-stopped
-
   # Companion Backend API
   api:
     build:
@@ -283,7 +273,7 @@ services:
       - JWT_SECRET=change_this_to_a_secure_random_string
       - CARER_USERNAME=carer
       - CARER_PASSWORD=your_carer_password
-      - N8N_LEARNING_WEBHOOK_URL=http://n8n:5678/webhook/learning-loop
+      - N8N_LEARNING_WEBHOOK_URL=https://n8n.zu-auto.co.uk/webhook/learning-loop
       - OPENROUTER_API_KEY=your_openrouter_api_key_here
     ports:
       - "8001:8000"
@@ -334,7 +324,7 @@ After changing environment variables, go to the container and click **Recreate**
 Now that n8n is running, let's add the automation workflows.
 
 ### 9.1 Access n8n
-1. Go to `http://your-vps-ip:5678`
+1. Go to `https://n8n.zu-auto.co.uk/`
 2. Log in with username: `admin` and password you set in Step 7
 
 ### 9.2 Import Morning Routine Workflow
@@ -422,7 +412,7 @@ Follow the guide in `docs/ios_shortcut_setup.md`
 |---------|-----|---------|
 | Frontend | `http://your-vps-ip:8001` | John's app |
 | Carrier Dashboard | `http://your-vps-ip:8001/carer` | For you to manage |
-| n8n | `http://your-vps-ip:5678` | Automation workflows |
+| n8n | `https://n8n.zu-auto.co.uk/` | Automation workflows |
 | API Health | `http://your-vps-ip:8001/api/health` | Check if API is running |
 
 ---

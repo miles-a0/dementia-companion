@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # PostgreSQL Database (NEW for this app)
   db:
@@ -20,15 +18,30 @@ services:
   # Companion API (Backend)
   companion-api:
     build:
-      context: ./companion-backend
+      context: .
+      dockerfile: companion-backend/Dockerfile
     container_name: companion-api
     ports:
       - "5471:8001"
-    env_file: ./companion-backend/.env
+    environment:
+      - QDRANT_URL=http://173.249.40.161:5467
+      - N8N_URL=https://n8n.zu-auto.co.uk
+      - N8N_LEARNING_WEBHOOK_URL=https://n8n.zu-auto.co.uk/webhook/learning-loop
+      - IMMICH_URL=http://173.249.40.161:2283
+      - IMMICH_API_KEY=eeq1EQNyIWKSH03tAVV4ojPBp3hNcMQwI7NDgSwh1o
+      - VIKUNJA_URL=https://vik.zu-auto.co.uk
+      - VIKUNJA_API_KEY=tk_78320358404f85c3fe92b139dc307d04ba3de518
+      - OPENROUTER_API_KEY=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
+      - DATABASE_URL=postgresql://companion:your_secure_password_here@db:5432/companion
+      - JWT_SECRET=zY8rJpQ4sVn2XcKfL1aW7eTgH5uBqD3mR6yN0oI8pCwSxE4FvUjZkG1hM2lA9t
+      - CARER_USERNAME=carer
+      - CARER_PASSWORD=your_carer_password
+      - JOHN_LAT=53.8317
+      - JOHN_LON=-2.2340
+      - JOHN_USER_ID=1
+      - WHISPER_URL=http://whisper:8000
     networks:
       - companion-net
-    volumes:
-      - ./companion-backend:/app
     depends_on:
       - db
     restart: unless-stopped
@@ -54,4 +67,4 @@ volumes:
 
 networks:
   companion-net:
-    external: true
+    driver: bridge

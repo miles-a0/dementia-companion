@@ -228,6 +228,26 @@ The frontend will be built into the API container and served from there, or we c
 
 Instead of deploying containers one by one, let's use Docker Compose. This handles everything automatically.
 
+### 7.1 Where to Set Environment Variables
+
+The `N8N_LEARNING_WEBHOOK_URL` goes in the **API container** environment variables.
+
+In Portainer:
+1. Go to **Stacks** (left menu)
+2. Find your `companion-app` stack (or create it)
+3. Click **Edit**
+4. Under the `api` service, find **Environment variables**
+5. Add:
+   - `N8N_LEARNING_WEBHOOK_URL` = `https://n8n.zu-auto.co.uk/webhook/learning-loop`
+
+Or if you deploy the API as a standalone container:
+1. Go to **Containers**
+2. Find `companion-api`
+3. Click **Edit**
+4. Under **Env**, add the variable
+
+---
+
 Create a file called `docker-compose.companion.yml` in Portainer's Stacks:
 
 ```yaml

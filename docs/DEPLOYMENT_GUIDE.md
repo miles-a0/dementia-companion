@@ -158,10 +158,10 @@ In Portainer:
    - **Image**: `qdrant/qdrant:latest`
    - **Network**: `companion-network`
 3. Publish port:
-   - Host: `6333`
+   - Host: `5467`
    - Container: `6333`
 4. Add another port:
-   - Host: `6334`
+   - Host: `5468`
    - Container: `6334`
 5. Volumes:
    - Host path: `/opt/companion/qdrant`
@@ -248,8 +248,8 @@ services:
     volumes:
       - /opt/companion/qdrant:/qdrant/storage
     ports:
-      - "6333:6333"
-      - "6334:6334"
+      - "5467:6333"
+      - "5468:6334"
     networks:
       - companion-network
     restart: unless-stopped

@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import HomeScreen from './components/HomeScreen';
 import GreetingBanner from './components/GreetingBanner';
+import PhotoViewer from './components/PhotoViewer';
+import MusicPlayer from './components/MusicPlayer';
 import { speak, listen, isSupported } from './services/speech';
 import { startPolling, stopPolling } from './services/polling';
 import './styles/john.css';
@@ -14,6 +16,10 @@ function App() {
   var isListening = useState(false);
   var isSpeaking = useState(false);
   var conversationId = useState(null);
+  var showPhotos = useState(false);
+  var photoAlbum = useState('merchant navy');
+  var showMusic = useState(false);
+  var musicTrack = useState(null);
 
   var setGreetingMessage = greetingMessage[1];
   var setGreetingType = greetingType[1];
@@ -21,6 +27,10 @@ function App() {
   var setIsListening = isListening[1];
   var setIsSpeaking = isSpeaking[1];
   var setConversationId = conversationId[1];
+  var setShowPhotos = showPhotos[1];
+  var setPhotoAlbum = photoAlbum[1];
+  var setShowMusic = showMusic[1];
+  var setMusicTrack = musicTrack[1];
 
   greetingMessage = greetingMessage[0];
   greetingType = greetingType[0];
@@ -28,12 +38,48 @@ function App() {
   isListening = isListening[0];
   isSpeaking = isSpeaking[0];
   conversationId = conversationId[0];
+  showPhotos = showPhotos[0];
+  photoAlbum = photoAlbum[0];
+  showMusic = showMusic[0];
+  musicTrack = musicTrack[0];
 
   function handleIncomingMessage(message) {
     if (message && message.content) {
-      setGreetingMessage(message.content);
+      var content = message.content;
+      
+      if (content.indexOf('[SHOW_PHOTOS:') !== -1) {
+        var startTag = '[SHOW_PHOTOS:';
+        var endTag = ']';
+        var startIdx = content.indexOf(startTag);
+        var endIdx = content.indexOf(endTag, startIdx);
+        if (startIdx !== -1 && endIdx !== -1) {
+          var albumName = content.substring(startIdx + startTag.length, endIdx);
+          setPhotoAlbum(albumName);
+          setShowPhotos(true);
+          content = content.substring(0, startIdx) + content.substring(endIdx + 1);
+        }
+      }
+      
+      if (content.indexOf('[PLAY_MUSIC:') !== -1) {
+        var mStartTag = '[PLAY_MUSIC:';
+        var mEndTag = ']';
+        var mStartIdx = content.indexOf(mStartTag);
+        var mEndIdx = content.indexOf(mEndTag, mStartIdx);
+        if (mStartIdx !== -1 && mEndIdx !== -1) {
+          var trackTitle = content.substring(mStartIdx + mStartTag.length, mEndIdx);
+          setMusicTrack(trackTitle);
+          setShowMusic(true);
+          content = content.substring(0, mStartIdx) + content.substring(mEndIdx + 1);
+        }
+      }
+      
+      content = content.trim();
+      
+      setGreetingMessage(content);
       setGreetingType(message.message_type);
-      speak(message.content);
+      if (content) {
+        speak(content);
+      }
       setTimeout(function() {
         if (greetingMessage === message.content) {
           setGreetingMessage(null);
@@ -104,13 +150,22 @@ function App() {
   }
 
   function handlePhotos() {
-    setCurrentView('photos');
+    setPhotoAlbum('merchant navy');
+    setShowPhotos(true);
     console.log('Photos pressed');
   }
 
   function handleMusic() {
-    setCurrentView('music');
+    setShowMusic(true);
     console.log('Music pressed');
+  }
+
+  function handleClosePhotos() {
+    setShowPhotos(false);
+  }
+
+  function handleCloseMusic() {
+    setShowMusic(false);
   }
 
   function handleGames() {
@@ -122,31 +177,45 @@ function App() {
     setGreetingMessage(null);
   }
 
+  var content = null;
+  
+  if (showPhotos) {
+    content = React.createElement(PhotoViewer, {
+      albumName: photoAlbum,
+      onClose: handleClosePhotos
+    });
+  } else if (showMusic) {
+    content = React.createElement(MusicPlayer, {
+      onClose: handleCloseMusic,
+      initialTrack: musicTrack
+    });
+  } else {
+    content = React.createElement('div', null,
+      React.createElement(GreetingBanner, {
+        message: greetingMessage,
+        messageType: greetingType,
+        onDismiss: handleDismissGreeting
+      }),
+      React.createElement(HomeScreen, {
+        onHelpPress: handleHelpPress,
+        onPhotos: handlePhotos,
+        onMusic: handleMusic,
+        onGames: handleGames,
+        greetingMessage: greetingMessage,
+        isListening: isListening,
+        isSpeaking: isSpeaking,
+        onListenStart: handleListenStart,
+        onListenEnd: handleListenEnd
+      })
+    );
+  }
+
   return (
     <BrowserRouter>
       <Routes>
         <Route
           path="/"
-          element={
-            <div>
-              <GreetingBanner
-                message={greetingMessage}
-                messageType={greetingType}
-                onDismiss={handleDismissGreeting}
-              />
-              <HomeScreen
-                onHelpPress={handleHelpPress}
-                onPhotos={handlePhotos}
-                onMusic={handleMusic}
-                onGames={handleGames}
-                greetingMessage={greetingMessage}
-                isListening={isListening}
-                isSpeaking={isSpeaking}
-                onListenStart={handleListenStart}
-                onListenEnd={handleListenEnd}
-              />
-            </div>
-          }
+          element={content}
         />
         <Route path="/carer" element={<div>Carer dashboard coming in Phase 9</div>} />
         <Route path="*" element={<Navigate to="/" replace />} />

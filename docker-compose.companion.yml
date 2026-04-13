@@ -1,6 +1,21 @@
 version: "3.8"
 
 services:
+  # PostgreSQL Database (NEW for this app)
+  db:
+    image: postgres:15
+    container_name: companion-db
+    environment:
+      POSTGRES_DB: companion
+      POSTGRES_USER: companion
+      POSTGRES_PASSWORD: your_secure_password_here
+    volumes:
+      - companion-postgres:/var/lib/postgresql/data
+    networks:
+      - companion-net
+    restart: unless-stopped
+
+  # Companion API (Backend)
   companion-api:
     build:
       context: ./companion-backend
@@ -8,13 +23,15 @@ services:
     ports:
       - "8001:8001"
     env_file: ./companion-backend/.env
-    restart: unless-stopped
     networks:
       - companion-net
     volumes:
       - ./companion-backend:/app
-    depends_on: []
+    depends_on:
+      - db
+    restart: unless-stopped
 
+  # Whisper (Speech to Text)
   whisper:
     image: fedirz/faster-whisper-server:latest-cpu
     container_name: companion-whisper
@@ -25,12 +42,13 @@ services:
       - WHISPER__LANGUAGE=en
     volumes:
       - whisper-models:/root/.cache/huggingface
-    restart: unless-stopped
     networks:
       - companion-net
+    restart: unless-stopped
 
 volumes:
   whisper-models:
+  companion-postgres:
 
 networks:
   companion-net:

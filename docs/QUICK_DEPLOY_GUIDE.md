@@ -6,7 +6,8 @@ This guide gets the app running in about 30 minutes.
 
 ## What You Need
 
-- Portainer access
+- Portainer access at https://portainer.zu-auto.co.uk/
+- Your domain: https://john.zu-auto.co.uk/
 - Your existing n8n at https://n8n.zu-auto.co.uk/ (already working)
 - Your existing Qdrant at 173.249.40.161:5467 (already working)
 
@@ -58,12 +59,12 @@ If you want n8n to receive webhooks from the API:
 
 ### Test API is running:
 ```bash
-curl http://your-server-ip:5471/api/health
+curl http://john.zu-auto.co.uk:5471/api/health
 ```
 Should return: `{"status": "ok", "service": "companion-api"}`
 
 ### Test Carrier Login:
-1. Go to `http://your-server-ip:5471`
+1. Go to `http://john.zu-auto.co.uk:5471`
 2. Click "Carrier" in bottom right
 3. Login with username: `carrier` and password you set in .env
 
@@ -86,7 +87,7 @@ For each workflow:
 ## Step 6: Test on John's iPhone
 
 1. Open Safari on John's iPhone
-2. Go to `http://your-server-ip:5471`
+2. Go to `http://john.zu-auto.co.uk:5471`
 3. Tap **Share** → **Add to Home Screen**
 4. Name it "John's Companion"
 
@@ -106,10 +107,10 @@ If something doesn't work:
 
 ```bash
 # Is API running?
-curl http://your-server-ip:5471/api/health
+curl http://john.zu-auto.co.uk:5471/api/health
 
 # Is it connecting to database?
-curl http://your-server-ip:5471/api/messages/pending?user_id=1
+curl http://john.zu-auto.co.uk:5471/api/messages/pending?user_id=1
 
 # Can it reach n8n?
 curl -X POST https://n8n.zu-auto.co.uk/webhook/learning-loop -H "Content-Type: application/json" -d '{"conversation_id":1,"user_id":1}'

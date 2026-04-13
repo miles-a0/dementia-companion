@@ -1,0 +1,140 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, Arial, sans-serif;
+  font-size: 22px;
+  background: #ffffff;
+  color: #1a1a1a;
+  -webkit-text-size-adjust: 100%;
+}
+
+button {
+  min-height: 60px;
+  min-width: 60px;
+  font-size: 22px;
+  cursor: pointer;
+  border: none;
+  border-radius: 12px;
+}
+
+input, textarea {
+  font-size: 22px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 2px solid #cccccc;
+}
+
+.screen {
+  min-height: 100vh;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.homescreen {
+  min-height: 100vh;
+  background: #EBF4FF;
+  display: flex;
+  flex-direction: column;
+}
+
+.homescreen-topbar {
+  padding: 30px 20px;
+  text-align: center;
+}
+
+.homescreen-greeting {
+  font-size: 32px;
+  color: #185FA5;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.homescreen-time {
+  font-size: 48px;
+  color: #185FA5;
+  font-weight: bold;
+}
+
+.homescreen-date {
+  font-size: 24px;
+  color: #185FA5;
+  margin-top: 10px;
+}
+
+.homescreen-banner {
+  min-height: 80px;
+}
+
+.homescreen-banner-message {
+  background: white;
+  padding: 20px;
+  margin: 0 20px;
+  border-radius: 12px;
+  color: #185FA5;
+  font-size: 24px;
+  text-align: center;
+}
+
+.homescreen-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 40px 20px;
+}
+
+.help-button-container {
+  margin-bottom: 40px;
+}
+
+.help-button {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: #185FA5;
+  color: white;
+  font-size: 64px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.voice-interface-container {
+  margin-bottom: 40px;
+}
+
+.voice-interface {
+  background: white;
+  padding: 20px 40px;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.voice-interface p {
+  color: #185FA5;
+  font-size: 22px;
+}
+
+.homescreen-bottom {
+  display: flex;
+  justify-content: space-around;
+  padding: 30px 20px;
+  padding-bottom: 60px;
+}
+
+.homescreen-btn {
+  min-height: 80px;
+  min-width: 100px;
+  background: #185FA5;
+  color: white;
+  font-size: 18px;
+  border-radius: 12px;
+  padding: 10px 20px;
+}

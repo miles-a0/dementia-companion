@@ -1,8 +1,7 @@
 import os
 import logging
 from datetime import datetime, timedelta
-from fastapi import APIRouter, HTTPException, Header, Body
-from fastapi.security import Depends
+from fastapi import APIRouter, HTTPException, Header, Body, Depends
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["auth"])

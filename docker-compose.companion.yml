@@ -18,8 +18,8 @@ services:
   # Companion API (Backend)
   companion-api:
     build:
-      context: .
-      dockerfile: companion-backend/Dockerfile
+      context: ./companion-backend
+      dockerfile: Dockerfile
     container_name: companion-api
     ports:
       - "5471:8001"

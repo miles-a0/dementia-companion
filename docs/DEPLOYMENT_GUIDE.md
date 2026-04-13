@@ -6,11 +6,11 @@ This guide walks you through deploying the complete dementia companion system on
 
 ## What We'll Deploy
 
-The system has 5 main parts:
+The system has 4 main parts:
 
 1. **Companion API** - The backend FastAPI server
 2. **Companion Frontend** - The React PWA that runs on John's iPhone
-3. **PostgreSQL** - Database to store messages, conversations, medications
+3. **PostgreSQL** - (ALREADY INSTALLED ON YOUR SERVER - we'll connect to it)
 4. **Qdrant** - Vector database for storing and searching memories
 5. **n8n** - Automation workflow engine (runs the reminders, learning loop)
 
@@ -20,56 +20,69 @@ The system has 5 main parts:
 
 - A VPS with Docker installed
 - Portainer already set up on your VPS
+- PostgreSQL already installed and running on your server (not in Docker)
 - A domain name (optional, but recommended)
 
 ---
 
-## Step 1: Prepare the Docker Environment
+## Step 1: Find Your Existing PostgreSQL Connection Details
 
-### 1.1 Create a Docker Network
+Your PostgreSQL is already running on the server. You need to find the connection details.
 
-In Portainer:
-1. Go to **Networks** (left menu)
-2. Click **Add Network**
-3. Name: `companion-network`
-4. Driver: `bridge`
-5. Click **Create**
+### 1.1 Check PostgreSQL is running
+
+```bash
+sudo systemctl status postgresql
+```
+
+### 1.2 Get the connection details
+
+If you don't know your PostgreSQL password, set a new one:
+
+```bash
+sudo -u postgres psql
+ALTER USER postgres PASSWORD 'your_new_password';
+\q
+```
+
+### 1.3 Note down your connection info
+
+You'll need:
+- **Host**: `localhost` (or your server's IP)
+- **Port**: `5432` (default)
+- **Database name**: `companion` (we'll create this)
+- **Username**: `postgres` (or whatever user you use)
+- **Password**: whatever you set above
 
 ---
 
-## Step 2: Deploy PostgreSQL Database
+## Step 2: Create the Companion Database
 
-### 2.1 Create the Container
-
-In Portainer:
-1. Go to **Containers** (left menu)
-2. Click **Add Container**
-3. Configure:
-   - **Name**: `companion-db`
-   - **Image**: `postgres:15`
-   - **Network**: Select `companion-network`
-4. Click **Publish a new network port**:
-   - Host: `5432`
-   - Container: `5432`
-5. Scroll down to **Env** (environment variables) and add:
-   - `POSTGRES_DB`: `companion`
-   - `POSTGRES_USER`: `companion`
-   - `POSTGRES_PASSWORD`: `Choose a strong password here`
-6. Scroll to **Volumes** and add:
-   - Type: **Bind**
-   - Host path: `/opt/companion/postgres` (create this folder on your VPS first)
-   - Container path: `/var/lib/postgresql/data`
-7. Click **Deploy the container**
-
-### 2.2 Create the Database Tables
-
-Connect to the database using a tool like DBeaver or via command line:
+Connect to your existing PostgreSQL:
 
 ```bash
-docker exec -it companion-db psql -U companion -d companion
+sudo -u postgres psql
 ```
 
-Run this SQL to create all the tables:
+Create the database and tables:
+
+```sql
+-- Create database
+CREATE DATABASE companion;
+
+-- Connect to the database
+\c companion
+
+-- Messages table
+CREATE TABLE IF NOT EXISTS messages (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    message_type VARCHAR(50),
+    created_at TIMESTAMP DEFAULT NOW(),
+    read_at TIMESTAMP,
+    spoken_at TIMESTAMP
+);
 
 ```sql
 -- Messages table
@@ -221,26 +234,14 @@ The frontend will be built into the API container and served from there, or we c
 
 Instead of deploying containers one by one, let's use Docker Compose. This handles everything automatically.
 
+**Important**: Since PostgreSQL is already on your server (not in Docker), we'll connect to it using the host machine's IP or socket.
+
 Create a file called `docker-compose.companion.yml` in Portainer's Stacks:
 
 ```yaml
 version: '3.8'
 
 services:
-  # PostgreSQL Database
-  db:
-    image: postgres:15
-    container_name: companion-db
-    environment:
-      POSTGRES_DB: companion
-      POSTGRES_USER: companion
-      POSTGRES_PASSWORD: your_secure_password_here
-    volumes:
-      - /opt/companion/postgres:/var/lib/postgresql/data
-    networks:
-      - companion-network
-    restart: unless-stopped
-
   # Qdrant Vector Database
   qdrant:
     image: qdrant/qdrant:latest
@@ -278,17 +279,19 @@ services:
       dockerfile: Dockerfile
     container_name: companion-api
     environment:
-      - DATABASE_URL=postgresql://companion:your_secure_password_here@db:5432/companion
+      # IMPORTANT: Use your server's IP instead of 'db' since PostgreSQL is not in Docker
+      - DATABASE_URL=postgresql://postgres:your_postgres_password@10.0.0.1:5432/companion
       - QDRANT_URL=http://qdrant:6333
       - JWT_SECRET=change_this_to_a_secure_random_string
       - CARER_USERNAME=carer
       - CARER_PASSWORD=your_carer_password
       - N8N_LEARNING_WEBHOOK_URL=http://n8n:5678/webhook/learning-loop
       - OPENROUTER_API_KEY=your_openrouter_api_key_here
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8001:8000"
     depends_on:
-      - db
       - qdrant
     networks:
       - companion-network
@@ -299,13 +302,20 @@ networks:
     driver: bridge
 ```
 
+**Key changes:**
+- Removed the `db` service (since PostgreSQL is already on your server)
+- Changed DATABASE_URL to use your server's IP address (e.g., `10.0.0.1`) instead of `db`
+
 ### Deploy the Stack
 
 1. In Portainer, go to **Stacks** (left menu)
 2. Click **Add Stack**
 3. Name: `companion-app`
 4. Paste the docker-compose code above
-5. Scroll to bottom and click **Deploy the stack**
+5. **Important**: Update the DATABASE_URL with:
+   - Your server's local IP address (check with `ip addr` or `hostname -I`)
+   - Your PostgreSQL password
+6. Click **Deploy the stack**
 
 ---
 
@@ -429,9 +439,11 @@ Follow the guide in `docs/ios_shortcut_setup.md`
 
 ## Troubleshooting
 
-### "Database not configured" error
+### "Database not configured" or connection error
 - Check DATABASE_URL environment variable is correct
-- Verify the db container is running
+- Verify PostgreSQL is running: `sudo systemctl status postgresql`
+- Make sure the DATABASE_URL uses your server's IP address (e.g., `10.0.0.1`), not `localhost` or `db`
+- Check PostgreSQL password is correct
 
 ### "Connection refused" errors
 - Make sure all containers are on the same network (`companion-network`)
@@ -462,16 +474,19 @@ Follow the guide in `docs/ios_shortcut_setup.md`
 # View all containers
 docker ps
 
-# View logs
+# View API logs
 docker logs companion-api
 
 # Restart a container
 docker restart companion-api
 
-# Access database
-docker exec -it companion-db psql -U companion -d companion
+# Access database (direct on server, not Docker)
+sudo -u postgres psql -d companion
 
-# Rebuild after code changes
+# Check PostgreSQL status
+sudo systemctl status postgresql
+
+# Rebuild API after code changes
 cd companion-backend
 docker build -t companion-api .
 docker rm -f companion-api

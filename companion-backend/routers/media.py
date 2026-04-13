@@ -24,8 +24,11 @@ async def get_photos(album: str = Query(default=""), user_id: int = Query(defaul
     if not album:
         return {"photos": [], "error": "Album name required"}
     
-    client = httpx.AsyncClient(timeout=30.0)
+    client = None
     try:
+        # Create a new client for each request
+        client = httpx.AsyncClient(timeout=30.0, follow_redirects=True)
+        
         # Get all albums
         response = await client.get(
             "{}/api/albums".format(IMMICH_URL),
@@ -33,7 +36,7 @@ async def get_photos(album: str = Query(default=""), user_id: int = Query(defaul
         )
         response.raise_for_status()
         albums = response.json()
-    
+        
         album_id = None
         album_name = None
         for a in albums:
@@ -43,6 +46,7 @@ async def get_photos(album: str = Query(default=""), user_id: int = Query(defaul
                 break
         
         if not album_id:
+            await client.aclose()
             return {"photos": [], "error": "Album not found"}
         
         # Get album details with assets
@@ -73,13 +77,17 @@ async def get_photos(album: str = Query(default=""), user_id: int = Query(defaul
             }
             photos.append(photo)
         
+        await client.aclose()
         return {"photos": photos, "album_name": album_name, "count": len(photos)}
     
     except Exception as e:
         logger.error("Error fetching photos: {}".format(e))
+        if client:
+            try:
+                await client.aclose()
+            except:
+                pass
         return {"photos": [], "error": str(e)}
-    finally:
-        await client.aclose()
 
 
 @router.get("/media/albums")

@@ -69,6 +69,7 @@ services:
       - "5472:80"
     volumes:
       - ./companion-frontend/dist:/usr/share/nginx/html:ro
+      - ./companion-frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
       - companion-net
     restart: unless-stopped

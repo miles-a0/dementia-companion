@@ -4,16 +4,49 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, Body
-
-# Placeholder imports - will be implemented in next tasks
-# from services.qdrant_client import search_memories
-# from services.openrouter import get_ai_response
+import psycopg2
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="", tags=["messages"])
 
-DATABASE_URL = os.getenv("DATABASE_URL")
 QDRANT_URL = os.getenv("QDRANT_URL", "http://qdrant:6333")
+
+
+def get_db_connection():
+    """Get synchronous database connection using psycopg2"""
+    DATABASE_URL = os.environ.get("DATABASE_URL")
+    if not DATABASE_URL:
+        logger.warning("DATABASE_URL not configured")
+        return None
+    try:
+        return psycopg2.connect(DATABASE_URL)
+    except Exception as e:
+        logger.warning(f"Database connection failed: {e}")
+        return None
+
+
+async def queue_message(user_id, content, message_type):
+    """Helper function to queue a message - can be imported by other routers"""
+    conn = get_db_connection()
+    if not conn:
+        return None
+    
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO messages (user_id, content, message_type, created_at)
+            VALUES (%s, %s, %s, NOW())
+            RETURNING id
+        """, (user_id, content, message_type))
+        new_id = cursor.fetchone()[0]
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return new_id
+    except Exception as e:
+        logger.error(f"Error in queue_message helper: {e}")
+        conn.close()
+        return None
 
 
 async def search_memories(query: str, collections: list, limit: int = 3):
@@ -28,17 +61,6 @@ async def get_ai_response(system_prompt: str, user_message: str):
     # TODO: Implement actual OpenRouter API call
     logger.info(f"Would call OpenRouter with prompt: {user_message}")
     return "I'm here to help you, John."
-
-
-async def get_db_connection():
-    """Get async database connection"""
-    try:
-        import asyncpg
-        conn = await asyncpg.connect(DATABASE_URL)
-        return conn
-    except Exception as e:
-        logger.warning(f"Database not configured: {e}")
-        return None
 
 
 @router.post("/messages/respond")
@@ -73,19 +95,20 @@ Here are some things you know about John:
         ai_response = await get_ai_response(system_prompt, text)
         
         # d. Log to Postgres conversations table
-        conn = await get_db_connection()
+        conn = get_db_connection()
         if conn:
             try:
-                await conn.execute("""
+                cursor = conn.cursor()
+                cursor.execute("""
                     INSERT INTO conversations (user_id, started_at, transcript, trigger_type)
-                    VALUES ($1, $2, $3, $4)
-                """, user_id, datetime.utcnow(), f'{{"user": "{text}", "assistant": "{ai_response}"}}', 'manual')
-                # TODO: Get the conversation_id after insert
+                    VALUES (%s, %s, %s, %s)
+                """, (user_id, datetime.utcnow(), f'{{"user": "{text}", "assistant": "{ai_response}"}}', 'manual'))
+                conn.commit()
+                cursor.close()
+                conn.close()
                 conversation_id = None
             except Exception as e:
                 logger.warning(f"Could not log conversation: {e}")
-            finally:
-                await conn.close()
         
         # e. Return response
         return {"response": ai_response, "conversation_id": conversation_id}
@@ -98,32 +121,41 @@ Here are some things you know about John:
 @router.get("/messages/pending")
 async def get_pending_message(user_id: int = Query(default=1)):
     try:
-        conn = await get_db_connection()
+        conn = get_db_connection()
         if not conn:
             logger.warning("Database not configured, returning null message")
             return {"message": None}
         
         try:
-            result = await conn.fetchrow("""
+            cursor = conn.cursor()
+            cursor.execute("""
                 SELECT id, content, message_type
                 FROM messages
-                WHERE user_id = $1 AND read_at IS NULL
+                WHERE user_id = %s AND read_at IS NULL
                 ORDER BY created_at ASC
                 LIMIT 1
-            """, user_id)
+            """, (user_id,))
+            row = cursor.fetchone()
             
-            if result:
-                await conn.execute("UPDATE messages SET read_at = NOW() WHERE id = $1", result['id'])
+            if row:
+                cursor.execute("UPDATE messages SET read_at = NOW() WHERE id = %s", (row[0],))
+                conn.commit()
+                cursor.close()
+                conn.close()
                 return {
                     "message": {
-                        "id": result['id'],
-                        "content": result['content'],
-                        "message_type": result['message_type']
+                        "id": row[0],
+                        "content": row[1],
+                        "message_type": row[2]
                     }
                 }
+            cursor.close()
+            conn.close()
             return {"message": None}
-        finally:
-            await conn.close()
+        except Exception as e:
+            logger.error(f"Error in get_pending_message: {e}")
+            conn.close()
+            return {"message": None}
             
     except Exception as e:
         logger.error(f"Error in get_pending_message: {e}")
@@ -133,14 +165,19 @@ async def get_pending_message(user_id: int = Query(default=1)):
 @router.delete("/messages/{message_id}")
 async def delete_message(message_id: int):
     try:
-        conn = await get_db_connection()
+        conn = get_db_connection()
         if not conn:
             return {"deleted": True}
         
         try:
-            await conn.execute("UPDATE messages SET spoken_at = NOW() WHERE id = $1", message_id)
-        finally:
-            await conn.close()
+            cursor = conn.cursor()
+            cursor.execute("UPDATE messages SET spoken_at = NOW() WHERE id = %s", (message_id,))
+            conn.commit()
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            logger.error(f"Error in delete_message: {e}")
+            conn.close()
         
         return {"deleted": True}
         
@@ -156,20 +193,27 @@ async def queue_message(
     message_type: str = Body(...)
 ):
     try:
-        conn = await get_db_connection()
+        conn = get_db_connection()
         if not conn:
             raise HTTPException(status_code=500, detail="Database not configured")
         
         try:
-            message_id = await conn.fetchval("""
+            cursor = conn.cursor()
+            cursor.execute("""
                 INSERT INTO messages (user_id, content, message_type, created_at)
-                VALUES ($1, $2, $3, NOW())
+                VALUES (%s, %s, %s, NOW())
                 RETURNING id
-            """, user_id, content, message_type)
-        finally:
-            await conn.close()
+            """, (user_id, content, message_type))
+            new_id = cursor.fetchone()[0]
+            conn.commit()
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            logger.error(f"Error in queue_message: {e}")
+            conn.close()
+            raise HTTPException(status_code=500, detail=str(e))
         
-        return {"queued": True, "message_id": message_id}
+        return {"queued": True, "message_id": new_id}
         
     except HTTPException:
         raise
@@ -218,15 +262,19 @@ Ask how he's feeling and remind him of the date."""
         ai_response = await get_ai_response(system_prompt, "Hello")
         
         # Queue the message
-        conn = await get_db_connection()
+        conn = get_db_connection()
         if conn:
             try:
-                await conn.execute("""
+                cursor = conn.cursor()
+                cursor.execute("""
                     INSERT INTO messages (user_id, content, message_type, created_at)
-                    VALUES ($1, $2, $3, NOW())
-                """, user_id, ai_response, intervention_type)
-            finally:
-                await conn.close()
+                    VALUES (%s, %s, %s, NOW())
+                """, (user_id, ai_response, intervention_type))
+                conn.commit()
+                cursor.close()
+                conn.close()
+            except Exception as e:
+                logger.warning(f"Could not queue message: {e}")
         
         return {"triggered": True, "intervention_type": intervention_type}
         

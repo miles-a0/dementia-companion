@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import HomeScreen from './components/HomeScreen';
 import GreetingBanner from './components/GreetingBanner';
 import { speak, listen, isSupported } from './services/speech';
+import { startPolling, stopPolling } from './services/polling';
 import './styles/john.css';
 
 function App() {
@@ -27,6 +28,26 @@ function App() {
   isListening = isListening[0];
   isSpeaking = isSpeaking[0];
   conversationId = conversationId[0];
+
+  function handleIncomingMessage(message) {
+    if (message && message.content) {
+      setGreetingMessage(message.content);
+      setGreetingType(message.message_type);
+      speak(message.content);
+      setTimeout(function() {
+        if (greetingMessage === message.content) {
+          setGreetingMessage(null);
+        }
+      }, 30000);
+    }
+  }
+
+  useEffect(function() {
+    startPolling(handleIncomingMessage, 1);
+    return function() {
+      stopPolling();
+    };
+  }, []);
 
   function handleHelpPress() {
     setIsListening(true);

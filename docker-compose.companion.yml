@@ -61,6 +61,18 @@ services:
       - companion-net
     restart: unless-stopped
 
+  # Frontend Web UI
+  frontend:
+    image: nginx:alpine
+    container_name: companion-frontend
+    ports:
+      - "5472:80"
+    volumes:
+      - ./companion-frontend/dist:/usr/share/nginx/html:ro
+    networks:
+      - companion-net
+    restart: unless-stopped
+
 volumes:
   whisper-models:
   companion-postgres:

@@ -24,60 +24,62 @@ async def get_photos(album: str = Query(default=""), user_id: int = Query(defaul
     if not album:
         return {"photos": [], "error": "Album name required"}
     
+    client = httpx.AsyncClient(timeout=30.0)
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            # Get all albums
-            response = await client.get(
-                "{}/api/albums".format(IMMICH_URL),
-                headers=get_immich_headers()
-            )
-            response.raise_for_status()
-            albums = response.json()
+        # Get all albums
+        response = await client.get(
+            "{}/api/albums".format(IMMICH_URL),
+            headers=get_immich_headers()
+        )
+        response.raise_for_status()
+        albums = response.json()
+    
+        album_id = None
+        album_name = None
+        for a in albums:
+            if a.get("albumName", "").lower() == album.lower():
+                album_id = a.get("id")
+                album_name = a.get("albumName")
+                break
         
-            album_id = None
-            album_name = None
-            for a in albums:
-                if a.get("albumName", "").lower() == album.lower():
-                    album_id = a.get("id")
-                    album_name = a.get("albumName")
-                    break
+        if not album_id:
+            return {"photos": [], "error": "Album not found"}
+        
+        # Get album details with assets
+        album_response = await client.get(
+            "{}/api/albums/{}".format(IMMICH_URL, album_id),
+            headers=get_immich_headers()
+        )
+        album_response.raise_for_status()
+        album_data = album_response.json()
+        
+        # Get assets from album
+        assets = album_data.get("assets", [])
+        
+        photos = []
+        for asset in assets:
+            if asset.get("type") != "image":
+                continue
             
-            if not album_id:
-                return {"photos": [], "error": "Album not found"}
+            asset_id = asset.get("id")
+            exif_info = asset.get("exifInfo", {})
             
-            # Get album details with assets - use different endpoint
-            album_response = await client.get(
-                "{}/api/albums/{}".format(IMMICH_URL, album_id),
-                headers=get_immich_headers()
-            )
-            album_response.raise_for_status()
-            album_data = album_response.json()
-            
-            # Get assets from album
-            assets = album_data.get("assets", [])
-            
-            photos = []
-            for asset in assets:
-                if asset.get("type") != "image":
-                    continue
-                
-                asset_id = asset.get("id")
-                exif_info = asset.get("exifInfo", {})
-                
-                photo = {
-                    "id": asset_id,
-                    "thumbnail_url": "{}/api/assets/{}/thumbnail?size=preview".format(IMMICH_URL, asset_id),
-                    "full_url": "{}/api/assets/{}/original".format(IMMICH_URL, asset_id),
-                    "description": exif_info.get("description") or "",
-                    "date_taken": exif_info.get("dateTimeOriginal") or asset.get("fileCreatedAt") or ""
-                }
-                photos.append(photo)
-            
-            return {"photos": photos, "album_name": album_name, "count": len(photos)}
+            photo = {
+                "id": asset_id,
+                "thumbnail_url": "{}/api/assets/{}/thumbnail?size=preview".format(IMMICH_URL, asset_id),
+                "full_url": "{}/api/assets/{}/original".format(IMMICH_URL, asset_id),
+                "description": exif_info.get("description") or "",
+                "date_taken": exif_info.get("dateTimeOriginal") or asset.get("fileCreatedAt") or ""
+            }
+            photos.append(photo)
+        
+        return {"photos": photos, "album_name": album_name, "count": len(photos)}
     
     except Exception as e:
         logger.error("Error fetching photos: {}".format(e))
         return {"photos": [], "error": str(e)}
+    finally:
+        await client.aclose()
 
 
 @router.get("/media/albums")

@@ -11,6 +11,8 @@ services:
       POSTGRES_PASSWORD: your_secure_password_here
     volumes:
       - companion-postgres:/var/lib/postgresql/data
+    ports:
+      - "5466:5432"
     networks:
       - companion-net
     restart: unless-stopped
@@ -21,7 +23,7 @@ services:
       context: ./companion-backend
     container_name: companion-api
     ports:
-      - "8001:8001"
+      - "5471:8001"
     env_file: ./companion-backend/.env
     networks:
       - companion-net
@@ -36,7 +38,7 @@ services:
     image: fedirz/faster-whisper-server:latest-cpu
     container_name: companion-whisper
     ports:
-      - "8000:8000"
+      - "6470:8000"
     environment:
       - WHISPER__MODEL=base
       - WHISPER__LANGUAGE=en

@@ -58,14 +58,14 @@ If you want n8n to receive webhooks from the API:
 
 ### Test API is running:
 ```bash
-curl http://your-server-ip:8001/api/health
+curl http://your-server-ip:5471/api/health
 ```
 Should return: `{"status": "ok", "service": "companion-api"}`
 
 ### Test Carrier Login:
-1. Go to `http://your-server-ip:8001`
+1. Go to `http://your-server-ip:5471`
 2. Click "Carrier" in bottom right
-3. Login with username: `carer` and password you set in .env
+3. Login with username: `carrier` and password you set in .env
 
 ---
 
@@ -86,7 +86,7 @@ For each workflow:
 ## Step 6: Test on John's iPhone
 
 1. Open Safari on John's iPhone
-2. Go to `http://your-server-ip:8001`
+2. Go to `http://your-server-ip:5471`
 3. Tap **Share** → **Add to Home Screen**
 4. Name it "John's Companion"
 
@@ -98,7 +98,7 @@ If something doesn't work:
 
 1. **Check API logs**: Portainer → Containers → companion-api → Logs
 2. **Check database**: Make sure PostgreSQL container is running
-3. **Check ports**: 8001 (API), 5466 (Postgres external), 5467 (Qdrant external)
+3. **Check ports**: 5471 (API), 5466 (Postgres external), 5467 (Qdrant external), 6470 (Whisper)
 
 ---
 
@@ -106,10 +106,10 @@ If something doesn't work:
 
 ```bash
 # Is API running?
-curl http://your-server-ip:8001/api/health
+curl http://your-server-ip:5471/api/health
 
 # Is it connecting to database?
-curl http://your-server-ip:8001/api/messages/pending?user_id=1
+curl http://your-server-ip:5471/api/messages/pending?user_id=1
 
 # Can it reach n8n?
 curl -X POST https://n8n.zu-auto.co.uk/webhook/learning-loop -H "Content-Type: application/json" -d '{"conversation_id":1,"user_id":1}'

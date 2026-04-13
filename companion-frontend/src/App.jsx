@@ -13,44 +13,18 @@ import { startPolling, stopPolling } from './services/polling';
 import './styles/john.css';
 
 function App() {
-  var greetingMessage = useState(null);
-  var greetingType = useState('greeting');
-  var currentView = useState('home');
-  var isListening = useState(false);
-  var isSpeaking = useState(false);
-  var conversationId = useState(null);
-  var showPhotos = useState(false);
-  var photoAlbum = useState('merchant navy');
-  var showMusic = useState(false);
-  var musicTrack = useState(null);
-  var showGame = useState(false);
-  var carrierAuthenticated = useState(false);
-
-  var setGreetingMessage = greetingMessage[1];
-  var setGreetingType = greetingType[1];
-  var setCurrentView = currentView[1];
-  var setIsListening = isListening[1];
-  var setIsSpeaking = isSpeaking[1];
-  var setConversationId = conversationId[1];
-  var setShowPhotos = showPhotos[1];
-  var setPhotoAlbum = photoAlbum[1];
-  var setShowMusic = showMusic[1];
-  var setMusicTrack = musicTrack[1];
-  var setShowGame = showGame[1];
-  var setCarerAuthenticated = carrierAuthenticated[1];
-
-  greetingMessage = greetingMessage[0];
-  greetingType = greetingType[0];
-  currentView = currentView[0];
-  isListening = isListening[0];
-  isSpeaking = isSpeaking[0];
-  conversationId = conversationId[0];
-  showPhotos = showPhotos[0];
-  photoAlbum = photoAlbum[0];
-  showMusic = showMusic[0];
-  musicTrack = musicTrack[0];
-  showGame = showGame[0];
-  carrierAuthenticated = carrierAuthenticated[0];
+  var [greetingMessage, setGreetingMessage] = useState(null);
+  var [greetingType, setGreetingType] = useState('greeting');
+  var [currentView, setCurrentView] = useState('home');
+  var [isListening, setIsListening] = useState(false);
+  var [isSpeaking, setIsSpeaking] = useState(false);
+  var [conversationId, setConversationId] = useState(null);
+  var [showPhotos, setShowPhotos] = useState(false);
+  var [photoAlbum, setPhotoAlbum] = useState('merchant navy');
+  var [showMusic, setShowMusic] = useState(false);
+  var [musicTrack, setMusicTrack] = useState(null);
+  var [showGame, setShowGame] = useState(false);
+  var [carrierAuthenticated, setCarerAuthenticated] = useState(false);
 
   React.useEffect(function() {
     var token = localStorage.getItem('companion_carer_token');
@@ -117,194 +91,213 @@ function App() {
       }, 30000);
     }
   }
-
-  useEffect(function() {
-    startPolling(handleIncomingMessage, 1);
-    return function() {
-      stopPolling();
-    };
-  }, []);
-
-  function handleHelpPress() {
-    setIsListening(true);
+  
+  React.useEffect(function() {
+    if (!isSpeaking && !isListening) {
+      startPolling(handleIncomingMessage, 1);
+      return function() {
+        stopPolling();
+      };
+    }
+  }, [isSpeaking, isListening]);
+  
+  function handleMicClick() {
+    if (!isSupported()) {
+      setGreetingMessage("Sorry, voice input is not supported on this device.");
+      setGreetingType('error');
+      speak("Sorry, voice input is not supported on this device.");
+      return;
+    }
     
-    listen()
-      .then(function(transcript) {
-        fetch('http://localhost:8001/api/messages/respond', {
+    if (isListening) {
+      return;
+    }
+    
+    setIsListening(true);
+    speak("I'm listening...");
+    
+    listen(function(transcript) {
+      setIsListening(false);
+      if (transcript) {
+        setGreetingMessage(transcript);
+        setGreetingType('user');
+        fetch('/api/messages/respond', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            text: transcript,
-            user_id: 1,
-            conversation_id: conversationId
+            message: transcript,
+            user_id: 1
           })
         })
         .then(function(response) {
           return response.json();
         })
         .then(function(data) {
-          if (data.conversation_id) {
-            setConversationId(data.conversation_id);
+          if (data.response) {
+            setGreetingMessage(data.response);
+            setGreetingType('greeting');
+            speak(data.response);
           }
-          setIsListening(false);
-          setIsSpeaking(true);
-          
-          speak(data.response)
-            .then(function() {
-              setIsSpeaking(false);
-            })
-            .catch(function(err) {
-              console.error('TTS error:', err);
-              setIsSpeaking(false);
-            });
         })
         .catch(function(err) {
-          console.error('API error:', err);
-          setIsListening(false);
+          setGreetingMessage("Sorry, I had trouble connecting. Please try again.");
+          setGreetingType('error');
+          speak("Sorry, I had trouble connecting. Please try again.");
         });
-      })
-      .catch(function(err) {
-        console.error('Listen error:', err);
-        setIsListening(false);
-      });
+      }
+    }, function(err) {
+      setIsListening(false);
+      setGreetingMessage("Sorry, I couldn't understand. Please try again.");
+      setGreetingType('error');
+      speak("Sorry, I couldn't understand. Please try again.");
+    });
   }
-
-  function handleListenStart() {
-    setIsListening(true);
+  
+  function handleMessageClick() {
+    setCurrentView('chat');
   }
-
-  function handleListenEnd() {
-    setIsListening(false);
-  }
-
-  function handlePhotos() {
-    setPhotoAlbum('merchant navy');
-    setShowPhotos(true);
-    console.log('Photos pressed');
-  }
-
-  function handleMusic() {
-    setShowMusic(true);
-    console.log('Music pressed');
-  }
-
-  function handleClosePhotos() {
+  
+  function handleHomeClick() {
+    setCurrentView('home');
     setShowPhotos(false);
-  }
-
-  function handleCloseMusic() {
     setShowMusic(false);
-  }
-
-  function handleGames() {
-    setShowGame(true);
-    console.log('Games pressed');
-  }
-
-  function handleCloseGame() {
     setShowGame(false);
-  }
-
-  function handleDismissGreeting() {
     setGreetingMessage(null);
   }
-
+  
+  function handleCarerClick() {
+    window.location.href = '/carer/login';
+  }
+  
+  function handleClosePhotos() {
+    setShowPhotos(false);
+    setCurrentView('home');
+  }
+  
+  function handleCloseMusic() {
+    setShowMusic(false);
+    setCurrentView('home');
+  }
+  
+  function handleCloseGame() {
+    setShowGame(false);
+    setCurrentView('home');
+  }
+  
   var content = null;
   
   if (showPhotos) {
     content = React.createElement(PhotoViewer, {
       albumName: photoAlbum,
-      onClose: handleClosePhotos
+      onClose: handleClosePhotos,
+      autoNarrate: false
     });
   } else if (showMusic) {
     content = React.createElement(MusicPlayer, {
-      onClose: handleCloseMusic,
-      initialTrack: musicTrack
+      initialTrack: musicTrack,
+      autoPlay: true,
+      onClose: handleCloseMusic
     });
   } else if (showGame) {
     content = React.createElement(GameScreen, {
+      onComplete: handleCloseGame,
       onClose: handleCloseGame
     });
-  } else {
-    content = React.createElement('div', null,
-      React.createElement(GreetingBanner, {
-        message: greetingMessage,
-        messageType: greetingType,
-        onDismiss: handleDismissGreeting
-      }),
-      React.createElement(HomeScreen, {
-        onHelpPress: handleHelpPress,
-        onPhotos: handlePhotos,
-        onMusic: handleMusic,
-        onGames: handleGames,
-        greetingMessage: greetingMessage,
-        isListening: isListening,
-        isSpeaking: isSpeaking,
-        onListenStart: handleListenStart,
-        onListenEnd: handleListenEnd
-      })
-    );
-  }
-
-  var carrierLinkStyle = {
-    position: 'fixed',
-    bottom: '10px',
-    right: '10px',
-    fontSize: '14px',
-    color: '#999',
-    textDecoration: 'none'
-  };
-
-  if (showPhotos || showMusic || showGame) {
-    content = React.createElement('div', { style: { position: 'relative', height: '100vh' } },
-      content,
+  } else if (currentView === 'home' || currentView === 'chat') {
+    var backgroundImage = 'linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url(background.jpg)';
+    var mainContainerStyle = {
+      minHeight: '100vh',
+      backgroundImage: backgroundImage,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      position: 'relative',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      paddingTop: '80px'
+    };
+    
+    var headerStyle = {
+      fontSize: '48px',
+      fontWeight: 'bold',
+      color: 'white',
+      textAlign: 'center',
+      textShadow: '2px 2px 4px rgba(0,0,0,0.5)',
+      marginTop: '40px',
+      marginBottom: '20px'
+    };
+    
+    var buttonStyle = {
+      padding: '20px 40px',
+      fontSize: '32px',
+      fontWeight: 'bold',
+      color: 'white',
+      backgroundColor: '#185FA5',
+      border: 'none',
+      borderRadius: '15px',
+      cursor: 'pointer',
+      margin: '20px',
+      boxShadow: '0 4px 8px rgba(0,0,0,0.3)'
+    };
+    
+    var micButtonStyle = {
+      position: 'fixed',
+      bottom: '100px',
+      right: '30px',
+      width: '80px',
+      height: '80px',
+      borderRadius: '50%',
+      backgroundColor: isListening ? '#e74c3c' : '#185FA5',
+      border: 'none',
+      color: 'white',
+      fontSize: '36px',
+      cursor: 'pointer',
+      boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    };
+    
+    var micIcon = isListening ? '⏹' : '🎤';
+    
+    var carrierLinkStyle = {
+      position: 'fixed',
+      bottom: '30px',
+      right: '30px',
+      color: 'white',
+      fontSize: '18px',
+      textDecoration: 'underline',
+      cursor: 'pointer'
+    };
+    
+    content = React.createElement('div', { style: mainContainerStyle },
+      greetingMessage ? React.createElement(GreetingBanner, { message: greetingMessage, type: greetingType }) : null,
+      React.createElement('div', { style: headerStyle }, 'John\'s Companion'),
+      React.createElement('button', { style: buttonStyle, onClick: handleMessageClick }, 'I Need Help'),
+      React.createElement('button', { 
+        style: Object.assign({}, micButtonStyle, { animation: isListening ? 'pulse 1s infinite' : 'none' }), 
+        onClick: handleMicClick 
+      }, micIcon),
       React.createElement(Link, { to: '/carer', style: carrierLinkStyle }, 'Carer')
     );
-  } else {
-    content = React.createElement('div', { style: { position: 'relative', height: '100vh' } },
-      React.createElement(GreetingBanner, {
-        message: greetingMessage,
-        messageType: greetingType,
-        onDismiss: handleDismissGreeting
-      }),
-      React.createElement(HomeScreen, {
-        onHelpPress: handleHelpPress,
-        onPhotos: handlePhotos,
-        onMusic: handleMusic,
-        onGames: handleGames,
-        greetingMessage: greetingMessage,
-        isListening: isListening,
-        isSpeaking: isSpeaking,
-        onListenStart: handleListenStart,
-        onListenEnd: handleListenEnd
-      }),
-      React.createElement(Link, { to: '/carer', style: carrierLinkStyle }, 'Carer')
-    );
   }
-
+  
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route
-          path="/"
-          element={content}
-        />
-        <Route 
-          path="/carer/login" 
-          element={React.createElement(CarerLogin, { onLoginSuccess: handleCarerLogin })} 
-        />
-        <Route 
-          path="/carer" 
-          element={carrierAuthenticated 
+    React.createElement(BrowserRouter, null,
+      React.createElement(Routes, null,
+        React.createElement(Route, { path: '/', element: content }),
+        React.createElement(Route, { path: '/carer/login', element: React.createElement(CarerLogin, { onLoginSuccess: handleCarerLogin }) }),
+        React.createElement(Route, { 
+          path: '/carer', 
+          element: carrierAuthenticated 
             ? React.createElement(CarerDashboard, { onLogout: handleCarerLogout })
             : React.createElement(Navigate, { to: '/carer/login', replace: true })
-          } 
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+        }),
+        React.createElement(Route, { path: '*', element: React.createElement(Navigate, { to: '/', replace: true }) })
+      )
+    )
   );
 }
 

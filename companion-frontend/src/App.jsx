@@ -5,6 +5,7 @@ import HomeScreen from './components/HomeScreen';
 import GreetingBanner from './components/GreetingBanner';
 import PhotoViewer from './components/PhotoViewer';
 import MusicPlayer from './components/MusicPlayer';
+import GameScreen from './components/GameScreen';
 import { speak, listen, isSupported } from './services/speech';
 import { startPolling, stopPolling } from './services/polling';
 import './styles/john.css';
@@ -20,6 +21,7 @@ function App() {
   var photoAlbum = useState('merchant navy');
   var showMusic = useState(false);
   var musicTrack = useState(null);
+  var showGame = useState(false);
 
   var setGreetingMessage = greetingMessage[1];
   var setGreetingType = greetingType[1];
@@ -31,6 +33,7 @@ function App() {
   var setPhotoAlbum = photoAlbum[1];
   var setShowMusic = showMusic[1];
   var setMusicTrack = musicTrack[1];
+  var setShowGame = showGame[1];
 
   greetingMessage = greetingMessage[0];
   greetingType = greetingType[0];
@@ -42,6 +45,7 @@ function App() {
   photoAlbum = photoAlbum[0];
   showMusic = showMusic[0];
   musicTrack = musicTrack[0];
+  showGame = showGame[0];
 
   function handleIncomingMessage(message) {
     if (message && message.content) {
@@ -71,6 +75,11 @@ function App() {
           setShowMusic(true);
           content = content.substring(0, mStartIdx) + content.substring(mEndIdx + 1);
         }
+      }
+      
+      if (content.indexOf('[PLAY_GAME]') !== -1) {
+        content = content.replace('[PLAY_GAME]', '');
+        setShowGame(true);
       }
       
       content = content.trim();
@@ -169,8 +178,12 @@ function App() {
   }
 
   function handleGames() {
-    setCurrentView('games');
+    setShowGame(true);
     console.log('Games pressed');
+  }
+
+  function handleCloseGame() {
+    setShowGame(false);
   }
 
   function handleDismissGreeting() {
@@ -188,6 +201,10 @@ function App() {
     content = React.createElement(MusicPlayer, {
       onClose: handleCloseMusic,
       initialTrack: musicTrack
+    });
+  } else if (showGame) {
+    content = React.createElement(GameScreen, {
+      onClose: handleCloseGame
     });
   } else {
     content = React.createElement('div', null,

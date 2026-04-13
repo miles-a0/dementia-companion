@@ -49,7 +49,7 @@ In Portainer:
    - **Image**: `postgres:15`
    - **Network**: Select `companion-network`
 4. Click **Publish a new network port**:
-   - Host: `5432`
+   - Host: `5466`
    - Container: `5432`
 5. Scroll down to **Env** (environment variables) and add:
    - `POSTGRES_DB`: `companion`

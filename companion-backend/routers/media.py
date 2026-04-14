@@ -31,6 +31,11 @@ async def get_photos(album: str = Query(default=""), user_id: int = Query(defaul
     
     try:
         headers = get_immich_headers()
+        logger.info("Headers: {}".format(headers))
+        
+        # First verify we can reach Immich
+        test_resp = requests.get("{}/api/albums".format(IMMICH_URL), headers=headers, timeout=10)
+        logger.info("Test albums call status: {}".format(test_resp.status_code))
         
         # Get all albums
         response = requests.get(

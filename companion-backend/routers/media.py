@@ -1,6 +1,7 @@
 import os
 import logging
 import httpx
+import requests
 from fastapi import APIRouter, Query, UploadFile, File, Form
 from fastapi.responses import FileResponse
 
@@ -36,9 +37,6 @@ async def get_photos(album: str = Query(default=""), user_id: int = Query(defaul
     logger.info("Fetching photos for album: {}".format(album))
     
     try:
-        # Use synchronous requests instead
-        import requests
-        
         headers = get_immich_headers()
         
         # Get all albums
@@ -124,8 +122,6 @@ async def get_albums():
         return {"albums": [], "error": "IMMICH_API_KEY not configured"}
     
     try:
-        import requests
-        
         headers = get_immich_headers()
         
         logger.info("Fetching albums from: {}/api/albums".format(IMMICH_URL))
@@ -197,8 +193,6 @@ async def proxy_asset(asset_id: str, size: str = "original"):
         return {"error": "IMMICH_API_KEY not configured"}, 500
     
     try:
-        import requests
-        
         headers = get_immich_headers()
         
         if size == "thumbnail":
@@ -229,8 +223,6 @@ async def upload_photo(
         return {"error": "IMMICH_API_KEY not configured"}, 500
     
     try:
-        import requests
-        
         headers = get_immich_headers()
         
         target_album_id = album_id

@@ -11,6 +11,11 @@ IMMICH_URL = os.environ.get("IMMICH_URL", "http://immich-server:3001")
 IMMICH_API_KEY = os.environ.get("IMMICH_API_KEY")
 MUSIC_DIR = os.environ.get("MUSIC_DIR", "/app/music")
 
+logger.info("=== MEDIA ROUTER INITIALIZED ===")
+logger.info("IMMICH_URL: {}".format(IMMICH_URL))
+logger.info("IMMICH_API_KEY set: {}".format(bool(IMMICH_API_KEY)))
+logger.info("MUSIC_DIR: {}".format(MUSIC_DIR))
+
 
 def get_immich_headers():
     return {"x-api-key": IMMICH_API_KEY} if IMMICH_API_KEY else {}

@@ -1,5 +1,5 @@
 // Polls backend every 60s for messages from n8n workflows
-var API_BASE = 'http://173.249.40.161:8001/api';
+var API_BASE = '/api';
 var intervalId = null;
 
 export function startPolling(onMessage, userId) {

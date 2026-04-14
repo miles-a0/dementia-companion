@@ -1,7 +1,7 @@
 import os
 import logging
 import httpx
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, UploadFile, File, Form
 from fastapi.responses import FileResponse
 
 logger = logging.getLogger(__name__)
@@ -199,4 +199,84 @@ async def proxy_asset(asset_id: str, size: str = "original"):
     
     except Exception as e:
         logger.error("Error proxying asset: {}".format(e))
+        return {"error": str(e)}, 500
+
+
+@router.post("/media/upload/photo")
+async def upload_photo(
+    file: UploadFile = File(...),
+    album_id: str = Form(None),
+    album_name: str = Form(None)
+):
+    if not IMMICH_API_KEY:
+        return {"error": "IMMICH_API_KEY not configured"}, 500
+    
+    try:
+        import requests
+        
+        headers = get_immich_headers()
+        
+        target_album_id = album_id
+        
+        if not target_album_id and album_name:
+            response = requests.get(
+                "{}/api/albums".format(IMMICH_URL),
+                headers=headers,
+                timeout=30
+            )
+            response.raise_for_status()
+            albums = response.json()
+            
+            for a in albums:
+                if a.get("albumName", "").lower() == album_name.lower():
+                    target_album_id = a.get("id")
+                    break
+        
+        if not target_album_id:
+            return {"error": "Album not found. Create an album in Immich first."}, 400
+        
+        upload_url = "{}/api/upload".format(IMMICH_URL)
+        
+        file_content = await file.read()
+        
+        files = {"file": (file.filename, file_content, file.content_type)}
+        data = {"albumId": target_album_id} if target_album_id else {}
+        
+        upload_response = requests.post(
+            upload_url,
+            headers=headers,
+            files=files,
+            data=data,
+            timeout=60
+        )
+        
+        if upload_response.status_code == 200:
+            return {"message": "Photo uploaded successfully"}
+        else:
+            return {"error": upload_response.text}, upload_response.status_code
+    
+    except Exception as e:
+        logger.error("Error uploading photo: {}".format(e))
+        return {"error": str(e)}, 500
+
+
+@router.post("/media/upload/music")
+async def upload_music(file: UploadFile = File(...)):
+    try:
+        import aiofiles
+        
+        upload_dir = os.path.join(MUSIC_DIR, "uploads")
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        filepath = os.path.join(upload_dir, file.filename)
+        
+        content = await file.read()
+        
+        with open(filepath, "wb") as f:
+            f.write(content)
+        
+        return {"message": "Music uploaded successfully", "filename": file.filename}
+    
+    except Exception as e:
+        logger.error("Error uploading music: {}".format(e))
         return {"error": str(e)}, 500

@@ -16,7 +16,7 @@ function MedicationConfirm(props) {
 
   function handleConfirm() {
     setLoading(true);
-    fetch('http://173.249.40.161:8001/api/medication/confirm', {
+    fetch('/api/medication/confirm', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

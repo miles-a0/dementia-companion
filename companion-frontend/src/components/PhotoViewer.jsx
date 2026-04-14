@@ -2,15 +2,15 @@ import React from 'react';
 import { speak } from '../services/speech';
 
 function PhotoViewer(props) {
-  var loading = React.useState(true);
+  var loading = React.useState(props.loading !== undefined ? props.loading : false);
   var setLoading = loading[1];
   loading = loading[0];
   
-  var photos = React.useState([]);
+  var photos = React.useState(props.photos || []);
   photos = photos[0];
   var setPhotos = photos[1];
   
-  var currentIndex = React.useState(0);
+  var currentIndex = React.useState(props.initialIndex || 0);
   currentIndex = currentIndex[0];
   var setCurrentIndex = currentIndex[1];
   
@@ -19,7 +19,15 @@ function PhotoViewer(props) {
   var autoNarrate = props.autoNarrate !== undefined ? props.autoNarrate : true;
   
   React.useEffect(function() {
-    fetch('http://173.249.40.161:8001/api/media/photos?album=' + encodeURIComponent(albumName))
+    if (photos && photos.length > 0) {
+      setLoading(false);
+      return;
+    }
+    if (!albumName) {
+      setLoading(false);
+      return;
+    }
+    fetch('/api/media/photos?album=' + encodeURIComponent(albumName))
       .then(function(response) {
         return response.json();
       })

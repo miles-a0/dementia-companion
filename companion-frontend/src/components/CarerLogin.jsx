@@ -1,21 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 function CarerLogin(props) {
-  var username = React.useState('');
-  username = username[0];
-  var setUsername = username[1];
-  
-  var password = React.useState('');
-  password = password[0];
-  var setPassword = password[1];
-  
-  var error = React.useState('');
-  error = error[0];
-  var setError = error[1];
-  
-  var loading = React.useState(false);
-  loading = loading[0];
-  var setLoading = loading[1];
+  var navigate = useNavigate();
+  var [username, setUsername] = useState('');
+  var [password, setPassword] = useState('');
+  var [error, setError] = useState('');
+  var [loading, setLoading] = useState(false);
   
   var onLoginSuccess = props.onLoginSuccess;
   
@@ -24,7 +15,7 @@ function CarerLogin(props) {
     setError('');
     setLoading(true);
     
-    fetch('http://173.249.40.161:8001/api/auth/login', {
+    fetch('/api/auth/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -35,16 +26,25 @@ function CarerLogin(props) {
       })
     })
     .then(function(response) {
+      console.log('Login response status:', response.status);
       return response.json();
     })
     .then(function(data) {
+      console.log('Login response data:', data);
       setLoading(false);
       if (data.token) {
+        console.log('Setting token in localStorage');
         localStorage.setItem('companion_carer_token', data.token);
+        console.log('Calling onLoginSuccess');
         if (onLoginSuccess) {
           onLoginSuccess();
         }
+        console.log('Navigating to /carer');
+        alert('Login successful! Redirecting...');
+        navigate('/carer', { replace: true });
       } else {
+        console.log('No token in response');
+        alert('Login failed - no token');
         setError('Incorrect username or password');
       }
     })

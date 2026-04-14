@@ -34,7 +34,7 @@ function WordAssociation(props) {
     setSelectedIndex(null);
     setFeedbackMessage('');
     
-    fetch('http://173.249.40.161:8001/api/games/word-question?user_id=1')
+    fetch('/api/games/word-question?user_id=1')
       .then(function(response) {
         return response.json();
       })
@@ -75,7 +75,7 @@ function WordAssociation(props) {
       speak("Never mind John, the answer was " + correctAnswer);
     }
     
-    fetch('http://173.249.40.161:8001/api/games/answer', {
+    fetch('/api/games/answer', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

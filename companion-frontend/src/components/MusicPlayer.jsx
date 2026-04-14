@@ -28,7 +28,7 @@ function MusicPlayer(props) {
   var initialTrack = props.initialTrack;
   
   React.useEffect(function() {
-    fetch('http://173.249.40.161:8001/api/media/music')
+    fetch('/api/media/music')
       .then(function(response) {
         return response.json();
       })
@@ -61,7 +61,7 @@ function MusicPlayer(props) {
     var audio = new Audio();
     audioRef.current = audio;
     
-    var trackUrl = 'http://173.249.40.161:8001' + tracks[currentIndex].url;
+    var trackUrl = 'http://173.249.40.161:5471' + tracks[currentIndex].url;
     audio.src = trackUrl;
     audio.volume = 1.0;
     

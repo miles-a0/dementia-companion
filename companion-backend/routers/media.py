@@ -81,6 +81,9 @@ async def get_photos(album: str = Query(default=""), user_id: int = Query(defaul
         assets = album_data.get("assets", [])
         logger.info("Found {} assets".format(len(assets)))
         
+        if assets:
+            logger.info("First asset: {}".format(assets[0]))
+        
         photos = []
         for asset in assets:
             asset_type = asset.get("type", "")

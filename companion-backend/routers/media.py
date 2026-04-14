@@ -24,17 +24,10 @@ def get_immich_headers():
 
 @router.get("/media/photos")
 async def get_photos(album: str = Query(default=""), user_id: int = Query(default=1)):
-    logger.info("=== get_photos called with album: {}".format(album))
+    logger.info("=== get_photos START ===")
     logger.info("IMMICH_URL: {}".format(IMMICH_URL))
     logger.info("IMMICH_API_KEY set: {}".format(bool(IMMICH_API_KEY)))
-    
-    if not IMMICH_API_KEY:
-        return {"photos": [], "error": "IMMICH_API_KEY not configured"}
-    
-    if not album:
-        return {"photos": [], "error": "Album name required"}
-    
-    logger.info("Fetching photos for album: {}".format(album))
+    logger.info("Album param: {}".format(album))
     
     try:
         headers = get_immich_headers()

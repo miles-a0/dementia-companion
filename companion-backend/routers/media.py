@@ -18,6 +18,10 @@ def get_immich_headers():
 
 @router.get("/media/photos")
 async def get_photos(album: str = Query(default=""), user_id: int = Query(default=1)):
+    logger.info("=== get_photos called with album: {}".format(album))
+    logger.info("IMMICH_URL: {}".format(IMMICH_URL))
+    logger.info("IMMICH_API_KEY set: {}".format(bool(IMMICH_API_KEY)))
+    
     if not IMMICH_API_KEY:
         return {"photos": [], "error": "IMMICH_API_KEY not configured"}
     
@@ -41,6 +45,10 @@ async def get_photos(album: str = Query(default=""), user_id: int = Query(defaul
         response.raise_for_status()
         albums = response.json()
         logger.info("Found {} albums".format(len(albums)))
+        
+        # Log all album names for debugging
+        album_names = [a.get("albumName") for a in albums]
+        logger.info("Album names: {}".format(album_names))
         
         album_id = None
         album_name = None
@@ -81,8 +89,8 @@ async def get_photos(album: str = Query(default=""), user_id: int = Query(defaul
             
             photo = {
                 "id": asset_id,
-                "thumbnail_url": "{}/api/assets/{}/thumbnail?size=preview".format(IMMICH_URL, asset_id),
-                "full_url": "{}/api/assets/{}/original".format(IMMICH_URL, asset_id),
+                "thumbnail_url": "/api/media/proxy/asset/{}?size=thumbnail".format(asset_id),
+                "full_url": "/api/media/proxy/asset/{}?size=original".format(asset_id),
                 "description": exif_info.get("description") or "",
                 "date_taken": exif_info.get("dateTimeOriginal") or asset.get("fileCreatedAt") or ""
             }
@@ -98,6 +106,10 @@ async def get_photos(album: str = Query(default=""), user_id: int = Query(defaul
 
 @router.get("/media/albums")
 async def get_albums():
+    logger.info("=== get_albums called")
+    logger.info("IMMICH_URL: {}".format(IMMICH_URL))
+    logger.info("IMMICH_API_KEY set: {}".format(bool(IMMICH_API_KEY)))
+    
     if not IMMICH_API_KEY:
         return {"albums": [], "error": "IMMICH_API_KEY not configured"}
     
@@ -160,3 +172,31 @@ async def stream_music(filename: str):
         return {"error": "File not found"}, 404
     
     return FileResponse(filepath, media_type="audio/mpeg")
+
+
+@router.get("/media/proxy/asset/{asset_id}")
+async def proxy_asset(asset_id: str, size: str = "original"):
+    if not IMMICH_API_KEY:
+        return {"error": "IMMICH_API_KEY not configured"}, 500
+    
+    try:
+        import requests
+        
+        headers = get_immich_headers()
+        
+        if size == "thumbnail":
+            url = "{}/api/assets/{}/thumbnail?size=preview".format(IMMICH_URL, asset_id)
+        else:
+            url = "{}/api/assets/{}/original".format(IMMICH_URL, asset_id)
+        
+        response = requests.get(url, headers=headers, timeout=30)
+        response.raise_for_status()
+        
+        content_type = response.headers.get("content-type", "image/jpeg")
+        
+        from fastapi.responses import Response
+        return Response(content=response.content, media_type=content_type)
+    
+    except Exception as e:
+        logger.error("Error proxying asset: {}".format(e))
+        return {"error": str(e)}, 500

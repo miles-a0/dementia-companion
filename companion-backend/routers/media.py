@@ -104,10 +104,13 @@ async def get_photos(album: str = Query(default=""), user_id: int = Query(defaul
             photos.append(photo)
         
         logger.info("Returning {} photos".format(len(photos)))
+        logger.info("Photos data: {}".format(photos))
         return {"photos": photos, "album_name": album_name, "count": len(photos)}
     
     except Exception as e:
         logger.error("Error fetching photos: {}".format(e))
+        import traceback
+        logger.error("Traceback: {}".format(traceback.format_exc()))
         return {"photos": [], "error": str(e)}
 
 

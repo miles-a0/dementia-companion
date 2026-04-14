@@ -31,7 +31,7 @@ services:
       - QDRANT_URL=http://173.249.40.161:5467
       - N8N_URL=https://n8n.zu-auto.co.uk
       - N8N_LEARNING_WEBHOOK_URL=https://n8n.zu-auto.co.uk/webhook/learning-loop
-      - IMMICH_URL=http://host.docker.internal:2283
+      - IMMICH_URL=http://173.249.40.161:2283
       - IMMICH_API_KEY=eeq1EQNyIWKSH03tAVV4ojPBp3hNcMQwI7NDgSwh1o
       - VIKUNJA_URL=https://vik.zu-auto.co.uk
       - VIKUNJA_API_KEY=tk_78320358404f85c3fe92b139dc307d04ba3de518

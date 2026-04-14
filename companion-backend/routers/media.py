@@ -63,6 +63,7 @@ async def get_photos(album: str = Query(default=""), user_id: int = Query(defaul
             return {"photos": [], "error": "Album not found"}
         
         # Get album details
+        logger.info("Fetching album details for: {}".format(album_id))
         album_response = requests.get(
             "{}/api/albums/{}".format(IMMICH_URL, album_id),
             headers=headers,
@@ -71,6 +72,7 @@ async def get_photos(album: str = Query(default=""), user_id: int = Query(defaul
         album_response.raise_for_status()
         album_data = album_response.json()
         logger.info("Album data keys: {}".format(album_data.keys()))
+        logger.info("Album has assets: {}".format("assets" in album_data))
         
         # Get assets
         assets = album_data.get("assets", [])
@@ -114,13 +116,20 @@ async def get_albums():
         return {"albums": [], "error": "IMMICH_API_KEY not configured"}
     
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(
-                "{}/api/albums".format(IMMICH_URL),
-                headers=get_immich_headers()
-            )
-            response.raise_for_status()
-            albums = response.json()
+        import requests
+        
+        headers = get_immich_headers()
+        
+        logger.info("Fetching albums from: {}/api/albums".format(IMMICH_URL))
+        
+        response = requests.get(
+            "{}/api/albums".format(IMMICH_URL),
+            headers=headers,
+            timeout=30
+        )
+        response.raise_for_status()
+        albums = response.json()
+        logger.info("Found {} albums".format(len(albums)))
         
         album_list = []
         for a in albums:
@@ -236,11 +245,15 @@ async def upload_photo(
             return {"error": "Album not found. Create an album in Immich first."}, 400
         
         upload_url = "{}/api/upload".format(IMMICH_URL)
+        logger.info("Uploading to: {}".format(upload_url))
+        logger.info("Album ID: {}".format(target_album_id))
         
         file_content = await file.read()
+        logger.info("File size: {} bytes, filename: {}".format(len(file_content), file.filename))
         
         files = {"file": (file.filename, file_content, file.content_type)}
         data = {"albumId": target_album_id} if target_album_id else {}
+        logger.info("Uploading with files: {}, data: {}".format(files.keys(), data))
         
         upload_response = requests.post(
             upload_url,
@@ -249,6 +262,9 @@ async def upload_photo(
             data=data,
             timeout=60
         )
+        
+        logger.info("Upload response status: {}".format(upload_response.status_code))
+        logger.info("Upload response body: {}".format(upload_response.text[:500] if upload_response.text else "empty"))
         
         if upload_response.status_code == 200:
             return {"message": "Photo uploaded successfully"}

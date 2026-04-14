@@ -26,75 +26,74 @@ async def get_photos(album: str = Query(default=""), user_id: int = Query(defaul
     
     logger.info("Fetching photos for album: {}".format(album))
     
-    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-        try:
-            # Get all albums
-            response = await client.get(
-                "{}/api/albums".format(IMMICH_URL),
-                headers=get_immich_headers()
-            )
-            response.raise_for_status()
-            albums = response.json()
-            logger.info("Albums response: {}".format(albums[:2]))  # Log first 2 albums
+    try:
+        # Use synchronous requests instead
+        import requests
+        
+        headers = get_immich_headers()
+        
+        # Get all albums
+        response = requests.get(
+            "{}/api/albums".format(IMMICH_URL),
+            headers=headers,
+            timeout=30
+        )
+        response.raise_for_status()
+        albums = response.json()
+        logger.info("Found {} albums".format(len(albums)))
+        
+        album_id = None
+        album_name = None
+        for a in albums:
+            if a.get("albumName", "").lower() == album.lower():
+                album_id = a.get("id")
+                album_name = a.get("albumName")
+                break
+        
+        if not album_id:
+            logger.info("Album not found: {}".format(album))
+            return {"photos": [], "error": "Album not found"}
+        
+        # Get album details
+        album_response = requests.get(
+            "{}/api/albums/{}".format(IMMICH_URL, album_id),
+            headers=headers,
+            timeout=30
+        )
+        album_response.raise_for_status()
+        album_data = album_response.json()
+        logger.info("Album data keys: {}".format(album_data.keys()))
+        
+        # Get assets
+        assets = album_data.get("assets", [])
+        logger.info("Found {} assets".format(len(assets)))
+        
+        photos = []
+        for asset in assets:
+            asset_type = asset.get("type", "")
+            logger.info("Asset type: {}".format(asset_type))
             
-            album_id = None
-            album_name = None
-            for a in albums:
-                if a.get("albumName", "").lower() == album.lower():
-                    album_id = a.get("id")
-                    album_name = a.get("albumName")
-                    break
+            if asset_type != "image":
+                continue
             
-            if not album_id:
-                logger.info("Album not found: {}".format(album))
-                return {"photos": [], "error": "Album not found"}
+            asset_id = asset.get("id")
+            exif_info = asset.get("exifInfo", {})
             
-            # Get album details - Immich might have assets nested differently
-            album_response = await client.get(
-                "{}/api/albums/{}".format(IMMICH_URL, album_id),
-                headers=get_immich_headers()
-            )
-            album_response.raise_for_status()
-            album_data = album_response.json()
-            logger.info("Album data keys: {}".format(album_data.keys()))
-            
-            # Try different possible locations for assets
-            assets = []
-            if "assets" in album_data:
-                assets = album_data.get("assets", [])
-            elif "assets" in album_data.get("album", {}):
-                assets = album_data.get("album", {}).get("assets", [])
-            elif "items" in album_data:
-                assets = album_data.get("items", [])
-                
-            logger.info("Found {} assets".format(len(assets)))
-            
-            photos = []
-            for asset in assets:
-                asset_type = asset.get("type", "")
-                logger.info("Asset type: {}".format(asset_type))
-                
-                if asset_type != "image":
-                    continue
-                
-                asset_id = asset.get("id")
-                exif_info = asset.get("exifInfo", {})
-                
-                photo = {
-                    "id": asset_id,
-                    "thumbnail_url": "{}/api/assets/{}/thumbnail?size=preview".format(IMMICH_URL, asset_id),
-                    "full_url": "{}/api/assets/{}/original".format(IMMICH_URL, asset_id),
-                    "description": exif_info.get("description") or "",
-                    "date_taken": exif_info.get("dateTimeOriginal") or asset.get("fileCreatedAt") or ""
-                }
-                photos.append(photo)
-            
-            logger.info("Returning {} photos".format(len(photos)))
-            return {"photos": photos, "album_name": album_name, "count": len(photos)}
+            photo = {
+                "id": asset_id,
+                "thumbnail_url": "{}/api/assets/{}/thumbnail?size=preview".format(IMMICH_URL, asset_id),
+                "full_url": "{}/api/assets/{}/original".format(IMMICH_URL, asset_id),
+                "description": exif_info.get("description") or "",
+                "date_taken": exif_info.get("dateTimeOriginal") or asset.get("fileCreatedAt") or ""
+            }
+            photos.append(photo)
+        
+        logger.info("Returning {} photos".format(len(photos)))
+        return {"photos": photos, "album_name": album_name, "count": len(photos)}
     
-        except Exception as e:
-            logger.error("Error fetching photos: {}".format(e))
-            return {"photos": [], "error": str(e)}
+    except Exception as e:
+        logger.error("Error fetching photos: {}".format(e))
+        return {"photos": [], "error": str(e)}
 
 
 @router.get("/media/albums")
